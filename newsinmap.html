@@ -1,0 +1,154 @@
+<html>
+	<head>
+			<script src="./lib/openlayers/OpenLayers.light.js" type="text/javascript"></script>			
+		
+	</head>
+	<body>
+
+		<!-- <div id='map' style='width:570;height:300px;border:1'></div> -->
+		<div id='map' ></div>
+		<script>
+		
+		
+		
+			
+			var center = new OpenLayers.LonLat(124.4811 ,6.9716);		//WGS84 Coordinates of the news
+			var zoom=16;																				//Specify the zoom level 0-19
+			var articleURL = "https://ph.news.yahoo.com/";                        //URL of the news article 
+			var newsTitle ="SAF 44";															//Title of the news article
+			var msg ="Click here to view article";									   //Caption for the link	
+			
+			
+			var content = "<strong>" + newsTitle + " </strong><br><a href=" + articleURL + "  target='_blank'>" +  msg + "</a>"; //HTML for the popup
+			
+			var map = new OpenLayers.Map('map',{
+                    eventListeners: {
+                       
+                        "zoomend": zoomIn
+                    
+                    }
+                });				                         //Create a map
+				
+				
+				function zoomIn(event){
+					event.stop;
+				}
+			
+	//map.maxEntent = new OpenLayers.Bounds(-20037508.34,-20037508.34,20037508.34,20037508.34);
+			
+			// map.isValidZoomLevel = function(zoomLevel) {
+			   // return ( (zoomLevel != null) &&
+				  // (zoomLevel >= 5) && // set min level here, could read from property
+				  // (zoomLevel < this.getNumZoomLevels()) );
+			// }
+			
+	
+			
+			
+			var projWGS84 = new OpenLayers.Projection("EPSG:4326");	 //Define a projection WGS84		
+			var proj900913 = new OpenLayers.Projection("EPSG:900913"); //Google / Web Mercator	
+			
+			pgp_basemap_cache = new OpenLayers.Layer.XYZ(					//Use NAMRIA Basemap Tiles
+					'NAMRIA Basemap',
+					'http://s1.geoportal.gov.ph/tiles/v2/PGPv3/${z}/${x}/${y}.png',
+					{
+						isBaseLayer: true,						
+						sphericalMercator:true
+				    }
+			);
+			
+			
+			center.transform(projWGS84,proj900913 );	 //Tranform WGS84 to Google / Web Mercator
+			
+			var pointLayer = new  OpenLayers.Layer.Vector("Features",{         //Create a vector layer to contain features(points,lines or polygon) ( one point  for this app)
+				projection:"EPSG:900913"
+			});
+			
+			
+			var point = new OpenLayers.Geometry.Point(center.lon,center.lat);   //Create a point			
+			var pointFeature = new OpenLayers.Feature.Vector(point,null,{      //Create a feature using the point
+				//pointRadius:100,
+				fillOpacity:0.7,
+				externalGraphic:' ./lib/openlayers/img/marker.png',   //use image as marker
+				graphicWidth: 21, 
+				graphicHeight: 25,
+				graphicYOffset: -24
+			
+			
+			});
+			pointLayer.addFeatures([pointFeature]); //Add the feature to the vector layer
+			
+			
+			//---------create a control for us  to be able to select the point and display a popup screen
+			
+			var selectControl = new OpenLayers.Control.SelectFeature(pointLayer, {
+				hover:false,  //Don't show popup when i hover to the point
+				toggle:true,
+				//box:true,
+				onSelect: function(feature)  //Do this if i click the point
+				{
+				
+					feature.style.fillOpacity =1;
+					//feature.style.pointRadius=20;
+					feature.layer.drawFeature(feature);
+					
+					//Define a popup dialog
+					var popup = new OpenLayers.Popup.FramedCloud(feature.id,center,new OpenLayers.Size(250,100),content,null,true,function(){selectControl.unselectAll();});  //On clicking the close button, deselect the point/s
+
+					feature.popup=popup //create a reference to the popup so that we can remove it later by calling feature.popup
+					map.addPopup(popup); //Show the popup
+				}
+				,
+				onUnselect: function(feature) {   //When i click anywhere on the screen unselect the point
+					
+					feature.style.fillOpacity =0.7;
+					feature.style.pointRadius=16;
+					feature.renderIntent=null;
+					feature.layer.drawFeature(feature);
+					map.removePopup(feature.popup); //Remove the popup
+				
+				}
+				
+			});
+			
+			map.addControl(selectControl); //Add the selection control to the map
+			selectControl.activate();	//Activate the select control
+			map.addLayer(pgp_basemap_cache);  //Add the basemap to the map
+			map.addLayer(pointLayer); //Add the vector layer to the map
+			map.setCenter(center,zoom); //center to the point and zoom to the specified zoom level
+			
+			
+			 function getXYZ(a,zoom){
+				 var b=pgp_basemap_cache.getResolutionForZoom(zoom),c=Math.round((a.left-pgp_basemap_cache.maxExtent.left)/(b*pgp_basemap_cache.tileSize.w));
+				 a=Math.round((pgp_basemap_cache.maxExtent.top-a.top)/(b*pgp_basemap_cache.tileSize.h));
+				 b=zoom;
+				 if(pgp_basemap_cache.wrapDateLine)var d=Math.pow(2,b),c=(c%d+d)%d;
+				 return{x:c,y:a,z:b}
+			 }
+			 
+			 function getURL(a,zoom){a=getXYZ(a,zoom);var b=pgp_basemap_cache.url;OpenLayers.Util.isArray(b)&&(b=pgp_basemap_cache.selectUrl(""+a.x+a.y+a.z,b));return OpenLayers.String.format(b,a)}
+			
+			
+			var  bounds = new OpenLayers.Bounds(center.lon,center.lat,center.lon,center.lat);
+			
+			
+			var xyzURL= getURL(bounds,17);
+			
+			
+	 var http = new XMLHttpRequest();
+    http.open('HEAD', xyzURL);
+    http.onreadystatechange = function() {
+        if (http.readyState == http.DONE) {
+            //callback(this.status != 404);
+			console.log(http.status);
+        }
+    };
+    http.send();
+			
+			
+			
+		</script>
+	
+	</body>
+
+</html>
